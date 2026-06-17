@@ -1,0 +1,23 @@
+# Environment variables
+.env
+.env.*
+!*.example
+
+# Docker Local Configuration
+docker-compose.yml
+
+# Go binaries and build directories
+/server
+/dist/
+/bin/
+*.exe
+*.test
+*.prof
+
+# Application logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+.DS_Store
