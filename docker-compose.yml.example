@@ -1,39 +1,12 @@
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: <YOUR_DB_PASSWORD>
-      POSTGRES_DB: chat_history
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      # Mount the migration file to init directory so it runs automatically on first start
-      - ./internal/database/migrations.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  app:
+  chat-history-proxy:
     build: .
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
-      - PORT=8080
-      - DATABASE_URL=postgres://postgres:<YOUR_DB_PASSWORD>@db:5432/chat_history?sslmode=disable
+      - APP_PORT=8081
       - QISCUS_APP_ID=<YOUR_QISCUS_APP_ID>
       - QISCUS_SECRET_KEY=<YOUR_QISCUS_SECRET_KEY>
       - QISCUS_BASE_URL=https://api3.qiscus.com
-      - QISCUS_MULTICHANNEL_URL=https://multichannel.qiscus.com
-      - WEBHOOK_SECRET=<YOUR_WEBHOOK_SECRET>
-      - JWT_SECRET=<YOUR_JWT_SECRET_32_CHARS_OR_LONGER>
-      - JWT_EXPIRY_HOURS=720
-    depends_on:
-      db:
-        condition: service_healthy
-
-volumes:
-  postgres_data:
+      - JWT_PUBLIC_KEY=<YOUR_RSA_PUBLIC_KEY_PEM>
+      - CACHE_TTL_SECONDS=60

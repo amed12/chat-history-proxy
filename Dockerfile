@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/chat-history-proxy ./cmd/chat-history-proxy
 
 # Final stage
 FROM alpine:latest
@@ -27,8 +27,8 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/server .
+COPY --from=builder /app/chat-history-proxy .
 
-EXPOSE 8080
+EXPOSE 8081
 
-CMD ["/app/server"]
+CMD ["/app/chat-history-proxy"]
