@@ -6,7 +6,8 @@ sebuah sesi selesai, aplikasi mengganti room chat aktifnya dan tidak lagi bisa m
 lewat token user biasa. Layanan ini menukar identitas (JWT user → kredensial server Qiscus) supaya
 riwayat sesi lama tetap bisa dibaca — tanpa app perlu menyimpan salinan chat sendiri.
 
-Ditulis generik: **ganti klien = ganti isi `.env`, bukan ganti kode.**
+Dirancang generik: konfigurasi untuk setiap klien ditetapkan melalui `.env`
+tanpa perubahan kode.
 
 ## Fitur Utama
 
@@ -19,15 +20,17 @@ Ditulis generik: **ganti klien = ganti isi `.env`, bukan ganti kode.**
 - Cache pendek in-memory (default 60 detik) untuk daftar sesi per user, bisa dilewati per-request
   dengan `?fresh=1`.
 - **Semua nilai per-deployment (App ID, secret, base URL, public key JWT, TTL cache, port) dibaca
-  dari environment variable** — tidak ada yang hardcode di kode. Kredensial wajib membuat service
-  gagal start dengan pesan jelas kalau kosong, bukan diam-diam jalan tanpa autentikasi.
+  dari environment variable** — tidak ada nilai yang ditanamkan langsung di kode. Kredensial wajib
+  membuat layanan gagal dijalankan dengan pesan yang jelas apabila kosong; layanan tidak akan
+  berjalan tanpa autentikasi.
 
 ## Menjalankan secara lokal
 
 ```bash
 cp .env.example .env
-# isi QISCUS_APP_ID, QISCUS_SECRET_KEY, JWT_PUBLIC_KEY (RSA PEM) — semua wajib,
-# service akan gagal start dengan pesan jelas kalau salah satunya kosong
+# Tetapkan QISCUS_APP_ID, QISCUS_SECRET_KEY, dan JWT_PUBLIC_KEY (RSA PEM).
+# Seluruh nilai wajib diisi; layanan akan gagal dijalankan dengan pesan yang
+# jelas apabila salah satunya kosong.
 
 set -a; source .env; set +a
 go run ./cmd/chat-history-proxy
@@ -41,8 +44,8 @@ curl http://localhost:8081/health
 
 ### Testing tanpa auth backend klien asli
 
-`cmd/devtools/gen-dev-jwt` menandatangani JWT dev pakai key lokal — buat
-coba endpoint tanpa perlu backend auth klien beneran:
+`cmd/devtools/gen-dev-jwt` menandatangani JWT pengembangan menggunakan key
+lokal untuk menguji endpoint tanpa backend autentikasi klien:
 
 ```bash
 openssl genrsa -out .dev/jwt_private.pem 2048
@@ -53,21 +56,21 @@ TOKEN=$(go run ./cmd/devtools/gen-dev-jwt -key .dev/jwt_private.pem -sub some-us
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/sessions
 ```
 
-`.dev/` sudah di-`.gitignore` — key ini murni lokal, jangan pernah dipakai di
-deployment sungguhan.
+`.dev/` sudah di-`.gitignore`. Key ini hanya digunakan secara lokal dan tidak
+boleh digunakan pada deployment produksi.
 
 ## Menjalankan dengan Docker
 
 ```bash
 cp docker-compose.yml.example docker-compose.yml
-# isi environment: QISCUS_APP_ID, QISCUS_SECRET_KEY, JWT_PUBLIC_KEY
+# Tetapkan environment: QISCUS_APP_ID, QISCUS_SECRET_KEY, JWT_PUBLIC_KEY.
 
 docker-compose up -d --build
 docker-compose logs -f chat-history-proxy
 ```
 
-`docker-compose.yml` sengaja di-`.gitignore` (lihat `.gitignore`) supaya kredensial asli tidak
-pernah ter-commit — selalu mulai dari `docker-compose.yml.example`.
+`docker-compose.yml` di-`.gitignore` agar kredensial tidak pernah masuk ke
+repository. Mulailah dari `docker-compose.yml.example`.
 
 ## Kontrak API
 
@@ -82,8 +85,8 @@ GET /api/v1/sessions/{room_id}/messages
   -> { "data": [ { "id", "sender_role", "sender_name", "type", "text", "payload", "created_at" } ], "next_cursor": null }
 ```
 
-`room_id` yang bukan milik pemanggil token membalas `404` — bukan `403` — supaya tidak
-membocorkan keberadaan room orang lain.
+Untuk `room_id` yang tidak dimiliki oleh pemanggil token, layanan mengembalikan
+`404`, bukan `403`, agar keberadaan room pengguna lain tidak terungkap.
 
 ## Konfigurasi
 
@@ -99,12 +102,12 @@ membocorkan keberadaan room orang lain.
 ## Struktur kode
 
 ```
-cmd/chat-history-proxy/main.go   # entry point, wiring
-cmd/devtools/gen-dev-jwt/        # LOCAL DEV ONLY — generator JWT buat testing tanpa auth klien asli
+cmd/chat-history-proxy/main.go   # entry point dan wiring
+cmd/devtools/gen-dev-jwt/        # HANYA PENGEMBANGAN LOKAL — generator JWT untuk pengujian tanpa auth klien
 internal/proxy/
-  config/     # loader environment, gagal start kalau kredensial wajib kosong
+  config/     # loader environment; gagal dijalankan jika kredensial wajib kosong
   qiscus/     # klien REST admin Qiscus (get_user_rooms, load_comments)
-  cache/      # TTL cache in-memory generik, tanpa dependency eksternal
+  cache/      # TTL cache in-memory generik tanpa dependency eksternal
   middleware/ # verifikasi JWT RS256
   handler/    # /api/v1/sessions, /api/v1/sessions/{room_id}/messages
 internal/middleware/logger.go  # middleware generik
