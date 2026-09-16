@@ -39,6 +39,23 @@ Health check:
 curl http://localhost:8081/health
 ```
 
+### Testing tanpa auth backend klien asli
+
+`cmd/devtools/gen-dev-jwt` menandatangani JWT dev pakai key lokal — buat
+coba endpoint tanpa perlu backend auth klien beneran:
+
+```bash
+openssl genrsa -out .dev/jwt_private.pem 2048
+openssl rsa -in .dev/jwt_private.pem -pubout -out .dev/jwt_public.pem
+export JWT_PUBLIC_KEY="$(cat .dev/jwt_public.pem)"
+
+TOKEN=$(go run ./cmd/devtools/gen-dev-jwt -key .dev/jwt_private.pem -sub some-user-id -ttl 168h)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/sessions
+```
+
+`.dev/` sudah di-`.gitignore` — key ini murni lokal, jangan pernah dipakai di
+deployment sungguhan.
+
 ## Menjalankan dengan Docker
 
 ```bash
