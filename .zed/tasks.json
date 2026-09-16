@@ -1,0 +1,90 @@
+[
+  {
+    "label": "Backend: go build",
+    "command": "go build ./...",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: go vet",
+    "command": "go vet ./...",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: go test",
+    "command": "go test ./... -v",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: run all gates (build + vet + test)",
+    "command": "go build ./... && go vet ./... && go test ./...",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 1) setup .env",
+    "command": "test -f .env && echo '.env already exists, not overwriting' || (cp .env.example .env && echo 'Created .env — fill in QISCUS_APP_ID and QISCUS_SECRET_KEY (real, or dummy for local-only smoke test)')",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 2) generate dev RSA keypair (JWT, local-only)",
+    "command": "mkdir -p .dev && openssl genrsa -out .dev/jwt_private.pem 2048 && openssl rsa -in .dev/jwt_private.pem -pubout -out .dev/jwt_public.pem && echo 'Generated .dev/jwt_private.pem + .dev/jwt_public.pem (gitignored, dev-only, never real client keys)'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 3) kill anything still on :8090",
+    "command": "lsof -nP -iTCP:8090 -sTCP:LISTEN | awk 'NR>1{print $2}' | xargs -r kill -9; echo done",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 4) run chat-history-proxy (dev, port 8090)",
+    "command": "set -a; source .env 2>/dev/null; set +a; export APP_PORT=8090; export JWT_PUBLIC_KEY=\"$(cat .dev/jwt_public.pem)\"; go run ./cmd/chat-history-proxy",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 5) health check",
+    "command": "curl -sS http://localhost:8090/health && echo",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 6) generate a dev JWT (sub = your Qiscus login user_id)",
+    "command": "go run ./cmd/devtools/gen-dev-jwt -key .dev/jwt_private.pem -sub your-user-id -ttl 168h",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Backend: 7) smoke test GET /api/v1/sessions",
+    "command": "TOKEN=$(go run ./cmd/devtools/gen-dev-jwt -key .dev/jwt_private.pem -sub your-user-id -ttl 168h) && curl -sS -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8090/api/v1/sessions?fresh=1\" && echo",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
