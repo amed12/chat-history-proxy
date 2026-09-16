@@ -1,73 +1,105 @@
-# Chat History Archive Service
+# Chat History Proxy
 
-Layanan Golang mandiri (standalone) ini berfungsi untuk mengarsipkan pesan ruang obrolan Qiscus dan menyajikannya ke aplikasi klien (misal: Flutter) saat *sessional mode* token telah kedaluwarsa.
+Layanan Go mandiri (standalone), **tanpa database**, yang menjadi proxy read-only antara app
+klien dan REST API admin Qiscus. Untuk app yang berjalan dalam mode Qiscus *sessional*: setelah
+sebuah sesi selesai, aplikasi mengganti room chat aktifnya dan tidak lagi bisa membaca room lama
+lewat token user biasa. Layanan ini menukar identitas (JWT user → kredensial server Qiscus) supaya
+riwayat sesi lama tetap bisa dibaca — tanpa app perlu menyimpan salinan chat sendiri.
+
+Ditulis generik: **ganti klien = ganti isi `.env`, bukan ganti kode.**
 
 ## Fitur Utama
-- Menerima Webhook Qiscus "Mark as Resolved" dengan pengamanan **HMAC-SHA256 signature**.
-- Menarik riwayat lengkap chat dari Qiscus REST API.
-- Menyimpan arsip obrolan dalam bentuk JSONB di **PostgreSQL**.
-- Endpoint HTTP (dilindungi JWT) untuk permintaan riwayat obrolan dari klien.
 
----
+- **Tanpa database, tanpa webhook.** Riwayat diambil langsung dari Qiscus saat diminta.
+- `GET /api/v1/sessions` — daftar seluruh sesi (aktif + selesai) milik user yang terautentikasi.
+- `GET /api/v1/sessions/{room_id}/messages` — transkrip penuh satu sesi, **hanya** untuk room
+  milik user yang meminta (diverifikasi lewat daftar sesi, bukan dipercaya dari klien).
+- Autentikasi JWT RS256 (public key dari environment) — token diterbitkan sistem auth klien
+  sendiri, layanan ini hanya memvalidasinya.
+- Cache pendek in-memory (default 60 detik) untuk daftar sesi per user, bisa dilewati per-request
+  dengan `?fresh=1`.
+- **Semua nilai per-deployment (App ID, secret, base URL, public key JWT, TTL cache, port) dibaca
+  dari environment variable** — tidak ada yang hardcode di kode. Kredensial wajib membuat service
+  gagal start dengan pesan jelas kalau kosong, bukan diam-diam jalan tanpa autentikasi.
 
-## 🚀 Cara Menjalankan Aplikasi di Lokal (Menggunakan Docker)
+## Menjalankan secara lokal
 
-Proyek ini telah dikonfigurasi dengan Docker dan Docker Compose. Metode ini adalah cara paling mudah untuk menjalankan aplikasi dan database PostgreSQL secara bersamaan di komputer lokal Anda tanpa harus menginstal PostgreSQL secara manual.
+```bash
+cp .env.example .env
+# isi QISCUS_APP_ID, QISCUS_SECRET_KEY, JWT_PUBLIC_KEY (RSA PEM) — semua wajib,
+# service akan gagal start dengan pesan jelas kalau salah satunya kosong
 
-### Prasyarat
-- Pastikan Anda sudah menginstal [Docker Desktop](https://www.docker.com/products/docker-desktop/) atau OrbStack di komputer Anda.
+set -a; source .env; set +a
+go run ./cmd/chat-history-proxy
+```
 
-### Langkah-Langkah Menjalankan (Docker)
+Health check:
 
-1. **Konfigurasi Variabel Lingkungan**
-   Konfigurasi bawaan (`DATABASE_URL`, kredensial Qiscus tes, dll) sudah diatur di dalam file `docker-compose.yml`. 
-   Jika Anda ingin mengetesnya dengan kredensial Qiscus asli Anda, Anda dapat langsung mengedit bagian `environment` milik servis `app` di dalam `docker-compose.yml`.
+```bash
+curl http://localhost:8081/health
+```
 
-2. **Menjalankan Aplikasi dan Database**
-   Buka terminal di direktori proyek ini, lalu jalankan perintah berikut untuk mem-*build* dan menjalankan container di *background*:
-   ```bash
-   docker-compose up -d --build
-   ```
-   > *Catatan: Skrip migrasi database (`internal/database/migrations.sql`) secara otomatis akan dieksekusi ketika container PostgreSQL pertama kali berjalan, sehingga tabel `chat_archives` akan langsung tersedia tanpa perlu migrasi manual.*
+## Menjalankan dengan Docker
 
-3. **Melihat Log Aplikasi**
-   Untuk memastikan aplikasi telah berjalan dan berhasil terhubung ke database, cek log aplikasi dengan:
-   ```bash
-   docker-compose logs -f app
-   ```
-   Log tersebut akan menampilkan `database: connected` dan `server starting on :8080` jika proses *startup* berjalan mulus.
+```bash
+cp docker-compose.yml.example docker-compose.yml
+# isi environment: QISCUS_APP_ID, QISCUS_SECRET_KEY, JWT_PUBLIC_KEY
 
-4. **Menguji Layanan (Health Check)**
-   Untuk memverifikasi bahwa server backend telah aktif, Anda bisa memanggil endpoint *health check* menggunakan browser, Postman, atau Terminal:
-   ```bash
-   curl http://localhost:8080/health
-   ```
-   Respons yang benar adalah: `{"status":"ok"}`.
+docker-compose up -d --build
+docker-compose logs -f chat-history-proxy
+```
 
-5. **Menghentikan Layanan**
-   Untuk mematikan container aplikasi dan database:
-   ```bash
-   docker-compose down
-   ```
-   Jika Anda juga ingin menghapus seluruh data yang sudah tersimpan di database lokal Anda (reset *database volumes*), tambahkan flag `-v`:
-   ```bash
-   docker-compose down -v
-   ```
+`docker-compose.yml` sengaja di-`.gitignore` (lihat `.gitignore`) supaya kredensial asli tidak
+pernah ter-commit — selalu mulai dari `docker-compose.yml.example`.
 
----
+## Kontrak API
 
-## 🛠 Cara Menjalankan Aplikasi Secara Manual (Tanpa Docker)
+Semua endpoint di bawah `/api/v1/` butuh `Authorization: Bearer <JWT RS256>` dengan klaim `sub`
+berisi user id klien (kunci yang sama dipakai app untuk `widget.setUser({ userId })`).
 
-Jika Anda ingin menjalankan atau men-debug (*debug*) aplikasi langsung menggunakan Go:
+```
+GET /api/v1/sessions
+  -> { "data": [ { "room_id", "name", "started_at", "is_resolved", "last_message", "topic" } ], "next_cursor": null }
 
-1. Pastikan PostgreSQL berjalan dan Anda telah menjalankan/mengeksekusi kueri yang ada di file `internal/database/migrations.sql`.
-2. Buat file konfigurasi `.env` dengan menyalinnya dari *template*:
-   ```bash
-   cp .env.example .env
-   ```
-3. Sesuaikan nilai-nilai di dalam file `.env` (khususnya `DATABASE_URL` dan konfigurasi Qiscus).
-4. Unduh *dependencies* dan jalankan servernya:
-   ```bash
-   go mod tidy
-   go run ./cmd/server
-   ```
+GET /api/v1/sessions/{room_id}/messages
+  -> { "data": [ { "id", "sender_role", "sender_name", "type", "text", "payload", "created_at" } ], "next_cursor": null }
+```
+
+`room_id` yang bukan milik pemanggil token membalas `404` — bukan `403` — supaya tidak
+membocorkan keberadaan room orang lain.
+
+## Konfigurasi
+
+| Env | Wajib | Default | Keterangan |
+|---|---|---|---|
+| `APP_PORT` | tidak | `8081` | Port HTTP |
+| `QISCUS_APP_ID` | **ya** | — | App ID Qiscus milik klien |
+| `QISCUS_SECRET_KEY` | **ya** | — | Secret server Qiscus, tidak pernah dikirim ke app klien |
+| `QISCUS_BASE_URL` | tidak | `https://api3.qiscus.com` | |
+| `JWT_PUBLIC_KEY` | **ya** | — | Public key RSA (PEM) untuk memverifikasi JWT dari auth klien |
+| `CACHE_TTL_SECONDS` | tidak | `60` | Umur cache daftar sesi per user |
+
+## Struktur kode
+
+```
+cmd/chat-history-proxy/main.go   # entry point, wiring
+cmd/devtools/gen-dev-jwt/        # LOCAL DEV ONLY — generator JWT buat testing tanpa auth klien asli
+internal/proxy/
+  config/     # loader environment, gagal start kalau kredensial wajib kosong
+  qiscus/     # klien REST admin Qiscus (get_user_rooms, load_comments)
+  cache/      # TTL cache in-memory generik, tanpa dependency eksternal
+  middleware/ # verifikasi JWT RS256
+  handler/    # /api/v1/sessions, /api/v1/sessions/{room_id}/messages
+internal/middleware/logger.go  # middleware generik
+```
+
+Detail arsitektur, alasan desain, dan batasan yang diketahui: lihat
+[`docs/CHAT_HISTORY_PROXY.md`](./docs/CHAT_HISTORY_PROXY.md).
+
+## Test
+
+```bash
+go build ./...
+go vet ./...
+go test ./...
+```
