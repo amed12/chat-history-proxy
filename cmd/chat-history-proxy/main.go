@@ -16,12 +16,12 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 
-	sharedmiddleware "github.com/qiscus-community/chat-history-proxy/internal/middleware"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/cache"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/config"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/handler"
-	proxymiddleware "github.com/qiscus-community/chat-history-proxy/internal/proxy/middleware"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/qiscus"
+	sharedmiddleware "github.com/amed12/chat-history-proxy/internal/middleware"
+	"github.com/amed12/chat-history-proxy/internal/proxy/cache"
+	"github.com/amed12/chat-history-proxy/internal/proxy/config"
+	"github.com/amed12/chat-history-proxy/internal/proxy/handler"
+	proxymiddleware "github.com/amed12/chat-history-proxy/internal/proxy/middleware"
+	"github.com/amed12/chat-history-proxy/internal/proxy/qiscus"
 )
 
 func main() {

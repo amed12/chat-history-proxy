@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/amed12/chat-history-proxy/internal/proxy/qiscus"
 	"github.com/go-chi/chi/v5"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/qiscus"
 )
 
 type fakeFetcher struct {

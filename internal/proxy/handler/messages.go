@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	megamiddleware "github.com/amed12/chat-history-proxy/internal/proxy/middleware"
+	"github.com/amed12/chat-history-proxy/internal/proxy/qiscus"
 	"github.com/go-chi/chi/v5"
-	megamiddleware "github.com/qiscus-community/chat-history-proxy/internal/proxy/middleware"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/qiscus"
 )
 
 // MessageFetcher fetches every message in a room. Satisfied by

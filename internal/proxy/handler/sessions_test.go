@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	megamiddleware "github.com/qiscus-community/chat-history-proxy/internal/proxy/middleware"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/qiscus"
+	megamiddleware "github.com/amed12/chat-history-proxy/internal/proxy/middleware"
+	"github.com/amed12/chat-history-proxy/internal/proxy/qiscus"
 )
 
 type fakeLister struct {

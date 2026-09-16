@@ -1,4 +1,4 @@
-module github.com/qiscus-community/chat-history-proxy
+module github.com/amed12/chat-history-proxy
 
 go 1.22
 

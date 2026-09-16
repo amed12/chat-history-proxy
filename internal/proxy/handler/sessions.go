@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	megamiddleware "github.com/qiscus-community/chat-history-proxy/internal/proxy/middleware"
-	"github.com/qiscus-community/chat-history-proxy/internal/proxy/qiscus"
+	megamiddleware "github.com/amed12/chat-history-proxy/internal/proxy/middleware"
+	"github.com/amed12/chat-history-proxy/internal/proxy/qiscus"
 )
 
 // SessionLister fetches every session (room) belonging to a user.
